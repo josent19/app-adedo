@@ -1,11 +1,22 @@
+import { useState, useEffect } from 'react'
 import { Link, NavLink, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
+import { getProfile } from '../../hooks/useProfile'
 import toast from 'react-hot-toast'
 import Avatar from '../ui/Avatar'
 
 export default function Navbar() {
   const { user, signOut } = useAuth()
   const navigate = useNavigate()
+  const [isAdmin, setIsAdmin] = useState(false)
+
+  useEffect(() => {
+    if (!user) {
+      setIsAdmin(false)
+      return
+    }
+    getProfile(user.id).then(p => setIsAdmin(p?.role === 'admin')).catch(() => setIsAdmin(false))
+  }, [user])
 
   async function handleSignOut() {
     try {
@@ -34,6 +45,9 @@ export default function Navbar() {
               <NavLink to="/trips/new" className={linkClass}>Ofrecer viaje</NavLink>
               <NavLink to="/my-trips" className={linkClass}>Mis viajes</NavLink>
               <NavLink to="/my-bookings" className={linkClass}>Mis reservas</NavLink>
+              {isAdmin && (
+                <NavLink to="/admin/verifications" className={linkClass}>Panel admin</NavLink>
+              )}
             </>
           )}
         </nav>

@@ -29,6 +29,16 @@ export async function getMyBookings(userId) {
   return data
 }
 
+export async function getConfirmedBookingsForTrip(tripId) {
+  const { data, error } = await supabase
+    .from('bookings')
+    .select('*, profiles(id, full_name, avatar_url)')
+    .eq('trip_id', tripId)
+    .eq('status', 'confirmed')
+  if (error) throw error
+  return data
+}
+
 export async function cancelBooking(bookingId) {
   const { error } = await supabase
     .from('bookings')

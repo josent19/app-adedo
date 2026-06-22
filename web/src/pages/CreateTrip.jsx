@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useNavigate, useParams, Link } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { createTrip, updateTrip, getTripById } from '../hooks/useTrips'
+import { getProfile } from '../hooks/useProfile'
 import toast from 'react-hot-toast'
 
 const EMPTY_FORM = {
@@ -17,6 +18,13 @@ export default function CreateTrip() {
 
   const [form, setForm] = useState(EMPTY_FORM)
   const [loading, setLoading] = useState(false)
+  const [driverStatus, setDriverStatus] = useState(null)
+  const [profileLoading, setProfileLoading] = useState(true)
+
+  useEffect(() => {
+    if (!user) return
+    getProfile(user.id).then(p => setDriverStatus(p.driver_status)).finally(() => setProfileLoading(false))
+  }, [user])
 
   useEffect(() => {
     if (isEdit) {
@@ -47,6 +55,20 @@ export default function CreateTrip() {
 
   async function handleSubmit(e) {
     e.preventDefault()
+    if (!form.origin.trim() || !form.destination.trim()) {
+      toast.error('Completá origen y destino')
+      return
+    }
+    const seats = Number(form.total_seats)
+    if (!seats || seats < 1 || seats > 8) {
+      toast.error('Los lugares disponibles deben ser entre 1 y 8')
+      return
+    }
+    const price = Number(form.price_per_seat)
+    if (!price || price <= 0) {
+      toast.error('Ingresá un precio por asiento válido')
+      return
+    }
     setLoading(true)
     try {
       const payload = {
@@ -73,6 +95,25 @@ export default function CreateTrip() {
     }
   }
 
+  if (!isEdit && !profileLoading && driverStatus !== 'verified') {
+    return (
+      <div className="max-w-xl mx-auto px-4 py-10 text-center">
+        <h1 className="text-2xl font-bold text-slate-900 mb-3">Publicar un viaje</h1>
+        <div className="bg-amber-50 border border-amber-200 rounded-2xl p-6">
+          <p className="text-amber-800 text-sm mb-4">
+            Para poder publicar viajes necesitamos verificar tu identidad, licencia y seguro del auto.
+          </p>
+          <Link
+            to="/verify/driver"
+            className="inline-block bg-brand-500 hover:bg-brand-600 text-white font-medium px-6 py-3 rounded-xl transition-colors"
+          >
+            Verificarme como conductor
+          </Link>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="max-w-xl mx-auto px-4 py-10">
       <h1 className="text-2xl font-bold text-slate-900 mb-6">
@@ -84,13 +125,13 @@ export default function CreateTrip() {
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">Origen</label>
             <input name="origin" type="text" required value={form.origin} onChange={handleChange}
-              placeholder="Ej: Buenos Aires"
+              placeholder="Ej: Buenos Aires" maxLength={100}
               className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" />
           </div>
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">Destino</label>
             <input name="destination" type="text" required value={form.destination} onChange={handleChange}
-              placeholder="Ej: Mar del Plata"
+              placeholder="Ej: Mar del Plata" maxLength={100}
               className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" />
           </div>
         </div>
@@ -118,7 +159,7 @@ export default function CreateTrip() {
         <div>
           <label className="block text-sm font-medium text-slate-700 mb-1">Descripción (opcional)</label>
           <textarea name="description" rows={3} value={form.description} onChange={handleChange}
-            placeholder="Paradas en el camino, condiciones del viaje, etc."
+            placeholder="Paradas en el camino, condiciones del viaje, etc." maxLength={500}
             className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 resize-none" />
         </div>
 

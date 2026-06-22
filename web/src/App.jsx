@@ -4,6 +4,7 @@ import { AuthProvider } from './context/AuthContext'
 import Navbar from './components/layout/Navbar'
 import Footer from './components/layout/Footer'
 import ProtectedRoute from './components/layout/ProtectedRoute'
+import AdminRoute from './components/layout/AdminRoute'
 
 import Home from './pages/Home'
 import Search from './pages/Search'
@@ -14,6 +15,10 @@ import MyBookings from './pages/MyBookings'
 import Profile from './pages/Profile'
 import Login from './pages/Login'
 import Register from './pages/Register'
+import Verify from './pages/Verify'
+import ConfirmEmail from './pages/ConfirmEmail'
+import AdminVerifications from './pages/admin/AdminVerifications'
+import Feedback from './pages/Feedback'
 
 export default function App() {
   return (
@@ -28,6 +33,7 @@ export default function App() {
               <Route path="/trips/:id" element={<TripDetail />} />
               <Route path="/login" element={<Login />} />
               <Route path="/register" element={<Register />} />
+              <Route path="/confirm-email" element={<ConfirmEmail />} />
 
               <Route path="/trips/new" element={
                 <ProtectedRoute><CreateTrip /></ProtectedRoute>
@@ -43,6 +49,15 @@ export default function App() {
               } />
               <Route path="/profile" element={
                 <ProtectedRoute><Profile /></ProtectedRoute>
+              } />
+              <Route path="/verify/:tier" element={
+                <ProtectedRoute><Verify /></ProtectedRoute>
+              } />
+              <Route path="/admin/verifications" element={
+                <AdminRoute><AdminVerifications /></AdminRoute>
+              } />
+              <Route path="/feedback" element={
+                <ProtectedRoute><Feedback /></ProtectedRoute>
               } />
             </Routes>
           </main>

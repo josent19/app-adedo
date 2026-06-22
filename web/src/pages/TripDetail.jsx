@@ -1,8 +1,11 @@
 import { useEffect, useState, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
+import { Link } from 'react-router-dom'
 import { getTripById } from '../hooks/useTrips'
-import { bookSeat, getMyBookingForTrip } from '../hooks/useBookings'
+import { bookSeat, getMyBookingForTrip, getConfirmedBookingsForTrip } from '../hooks/useBookings'
 import { useAuth } from '../context/AuthContext'
+import { getProfile } from '../hooks/useProfile'
+import { submitReview, getReviewsForTrip, getAverageRating } from '../hooks/useReviews'
 import { supabase } from '../lib/supabaseClient'
 import Avatar from '../components/ui/Avatar'
 import Badge from '../components/ui/Badge'
@@ -14,6 +17,54 @@ function formatDate(isoString) {
   })
 }
 
+function ReviewForm({ name, onSubmit }) {
+  const [rating, setRating] = useState(5)
+  const [comment, setComment] = useState('')
+  const [sending, setSending] = useState(false)
+
+  async function handleSubmit(e) {
+    e.preventDefault()
+    setSending(true)
+    try {
+      await onSubmit(rating, comment)
+    } finally {
+      setSending(false)
+    }
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="bg-slate-50 rounded-xl border border-slate-200 p-4 space-y-2">
+      <p className="text-sm font-medium text-slate-700">Reseñá a {name}</p>
+      <div className="flex gap-1">
+        {[1, 2, 3, 4, 5].map(n => (
+          <button
+            key={n}
+            type="button"
+            onClick={() => setRating(n)}
+            className={`text-2xl leading-none ${n <= rating ? 'text-amber-400' : 'text-slate-300'}`}
+          >
+            ★
+          </button>
+        ))}
+      </div>
+      <textarea
+        value={comment}
+        onChange={e => setComment(e.target.value)}
+        rows={2}
+        placeholder="Comentario (opcional)"
+        className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 resize-none"
+      />
+      <button
+        type="submit"
+        disabled={sending}
+        className="bg-brand-500 hover:bg-brand-600 disabled:opacity-60 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
+      >
+        {sending ? 'Enviando...' : 'Dejar reseña'}
+      </button>
+    </form>
+  )
+}
+
 export default function TripDetail() {
   const { id } = useParams()
   const { user } = useAuth()
@@ -21,21 +72,34 @@ export default function TripDetail() {
 
   const [trip, setTrip] = useState(null)
   const [myBooking, setMyBooking] = useState(null)
+  const [myProfile, setMyProfile] = useState(null)
   const [loading, setLoading] = useState(true)
   const [booking, setBooking] = useState(false)
   const [messages, setMessages] = useState([])
   const [newMsg, setNewMsg] = useState('')
   const [sendingMsg, setSendingMsg] = useState(false)
+  const [driverRating, setDriverRating] = useState({ average: null, count: 0 })
+  const [confirmedPassengers, setConfirmedPassengers] = useState([])
+  const [myTripReviews, setMyTripReviews] = useState([])
   const messagesEndRef = useRef(null)
 
   useEffect(() => {
     Promise.all([
       getTripById(id),
       user ? getMyBookingForTrip(id, user.id) : Promise.resolve(null),
+      user ? getProfile(user.id) : Promise.resolve(null),
     ])
-      .then(([tripData, bookingData]) => {
+      .then(([tripData, bookingData, profileData]) => {
         setTrip(tripData)
         setMyBooking(bookingData)
+        setMyProfile(profileData)
+        getAverageRating(tripData.driver_id).then(setDriverRating)
+        if (tripData.status === 'completed' && user) {
+          getReviewsForTrip(id).then(reviews => setMyTripReviews(reviews.filter(r => r.reviewer_id === user.id)))
+          if (tripData.driver_id === user.id) {
+            getConfirmedBookingsForTrip(id).then(setConfirmedPassengers)
+          }
+        }
       })
       .catch(() => toast.error('No se pudo cargar el viaje'))
       .finally(() => setLoading(false))
@@ -109,7 +173,9 @@ export default function TripDetail() {
 
   const isDriver = user?.id === trip.driver_id
   const isParticipant = user && (isDriver || (myBooking?.status === 'confirmed'))
-  const canBook = user && !isDriver && !myBooking && trip.available_seats > 0 && trip.status === 'active'
+  const isVerifiedPassenger = myProfile?.passenger_status === 'verified'
+  const canBook = user && !isDriver && !myBooking && trip.available_seats > 0 && trip.status === 'active' && isVerifiedPassenger
+  const needsVerification = user && !isDriver && !myBooking && trip.available_seats > 0 && trip.status === 'active' && !isVerifiedPassenger
   const alreadyBooked = myBooking?.status === 'confirmed'
 
   return (
@@ -132,6 +198,9 @@ export default function TripDetail() {
             <Avatar name={trip.profiles?.full_name || 'Conductor'} />
             <div>
               <p className="font-medium text-slate-900">{trip.profiles?.full_name || 'Conductor'}</p>
+              {driverRating.count > 0 && (
+                <p className="text-xs text-amber-500">★ {driverRating.average.toFixed(1)} ({driverRating.count})</p>
+              )}
               {isParticipant && trip.profiles?.phone && (
                 <p className="text-sm text-slate-500">{trip.profiles.phone}</p>
               )}
@@ -160,6 +229,14 @@ export default function TripDetail() {
           >
             {booking ? 'Reservando...' : 'Reservar lugar'}
           </button>
+        )}
+        {needsVerification && (
+          <Link
+            to="/verify/passenger"
+            className="block w-full text-center bg-amber-500 hover:bg-amber-600 text-white font-medium py-3 rounded-xl transition-colors"
+          >
+            Verificá tu identidad para poder reservar
+          </Link>
         )}
         {alreadyBooked && (
           <div className="w-full bg-green-50 border border-green-200 text-green-700 text-sm font-medium py-3 rounded-xl text-center">
@@ -216,6 +293,59 @@ export default function TripDetail() {
               Enviar
             </button>
           </form>
+        </div>
+      )}
+
+      {/* Reseñas (solo en viajes completados) */}
+      {trip.status === 'completed' && isParticipant && (
+        <div className="space-y-3">
+          <h2 className="font-semibold text-slate-900">Dejar reseña</h2>
+          {isDriver ? (
+            confirmedPassengers.length === 0 ? (
+              <p className="text-sm text-slate-500">No hubo pasajeros confirmados en este viaje.</p>
+            ) : (
+              confirmedPassengers.map(b => {
+                const already = myTripReviews.some(r => r.reviewee_id === b.profiles.id)
+                if (already) {
+                  return (
+                    <p key={b.id} className="text-sm text-green-700">✓ Ya reseñaste a {b.profiles.full_name}</p>
+                  )
+                }
+                return (
+                  <ReviewForm
+                    key={b.id}
+                    name={b.profiles.full_name}
+                    onSubmit={async (rating, comment) => {
+                      try {
+                        await submitReview(id, user.id, b.profiles.id, rating, comment)
+                        toast.success('¡Gracias por tu reseña!')
+                        setMyTripReviews(prev => [...prev, { reviewee_id: b.profiles.id, reviewer_id: user.id }])
+                      } catch (err) {
+                        toast.error(err.message || 'Error al enviar la reseña')
+                      }
+                    }}
+                  />
+                )
+              })
+            )
+          ) : (
+            myTripReviews.some(r => r.reviewee_id === trip.driver_id) ? (
+              <p className="text-sm text-green-700">✓ Ya reseñaste a {trip.profiles?.full_name}</p>
+            ) : (
+              <ReviewForm
+                name={trip.profiles?.full_name || 'el conductor'}
+                onSubmit={async (rating, comment) => {
+                  try {
+                    await submitReview(id, user.id, trip.driver_id, rating, comment)
+                    toast.success('¡Gracias por tu reseña!')
+                    setMyTripReviews(prev => [...prev, { reviewee_id: trip.driver_id, reviewer_id: user.id }])
+                  } catch (err) {
+                    toast.error(err.message || 'Error al enviar la reseña')
+                  }
+                }}
+              />
+            )
+          )}
         </div>
       )}
     </div>
