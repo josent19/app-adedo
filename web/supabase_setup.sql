@@ -423,7 +423,7 @@ alter table public.notifications_log enable row level security;
 -- nunca expuesto vía la API a anon/authenticated.
 
 -- Plantilla visual compartida por los 3 emails (logo, tarjeta blanca, botón de marca, footer).
--- URL base de la app: reemplazar https://TUDOMINIO cuando esté deployada (Vercel, dominio propio, etc.)
+-- URL base de la app: reemplazar https://app-adedo.vercel.app cuando esté deployada (Vercel, dominio propio, etc.)
 create or replace function public.email_wrapper(p_body_html text, p_cta_text text default null, p_cta_url text default null)
 returns text
 language plpgsql
@@ -502,7 +502,7 @@ begin
         format('<p>Hola,</p><p>Tu viaje como conductor de <b>%s</b> a <b>%s</b> sale el %s.</p>',
           r.origin, r.destination, to_char(r.departure_at, 'DD/MM/YYYY HH24:MI')),
         'Ver viaje',
-        format('https://TUDOMINIO/trips/%s', r.trip_id)
+        format('https://app-adedo.vercel.app/trips/%s', r.trip_id)
       )
     );
     insert into public.notifications_log (user_id, trip_id, type) values (r.user_id, r.trip_id, 'trip_reminder');
@@ -527,7 +527,7 @@ begin
         format('<p>Hola,</p><p>Tu viaje de <b>%s</b> a <b>%s</b> sale el %s.</p>',
           r.origin, r.destination, to_char(r.departure_at, 'DD/MM/YYYY HH24:MI')),
         'Ver viaje',
-        format('https://TUDOMINIO/trips/%s', r.trip_id)
+        format('https://app-adedo.vercel.app/trips/%s', r.trip_id)
       )
     );
     insert into public.notifications_log (user_id, trip_id, type) values (r.user_id, r.trip_id, 'trip_reminder');
@@ -563,7 +563,7 @@ begin
         format('<p>Hola %s,</p><p>Para poder reservar viajes necesitamos que verifiques tu identidad. Subí tus documentos y quedás listo.</p>',
           coalesce(r.first_name, '')),
         'Verificar mi cuenta',
-        'https://TUDOMINIO/verify/passenger'
+        'https://app-adedo.vercel.app/verify/passenger'
       )
     );
     insert into public.notifications_log (user_id, type) values (r.user_id, 'incomplete_registration');
@@ -598,7 +598,7 @@ begin
         format('<p>Hola %s,</p><p>Hace un tiempo que no te vemos por A Dedo. ¡Volvé a compartir viajes!</p>',
           coalesce(r.first_name, '')),
         'Volver a A Dedo',
-        'https://TUDOMINIO/'
+        'https://app-adedo.vercel.app/'
       )
     );
     insert into public.notifications_log (user_id, type) values (r.user_id, 'inactivity');
